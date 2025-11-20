@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""
+Git repository management module.
+Handles git operations for storing patches as files.
+"""
+
+import os
+import subprocess
+from typing import Dict, Optional
+
+
+class GitManager:
+    """Manage git repository operations for Gerrit history preservation."""
+    
+    @staticmethod
+    def init_repo(repo_path: str, branch_name: str = 'gerrit-history') -> bool:
+        """
+        Initialize a git repository for storing patches and HTML files.
+        
+        Args:
+            repo_path: Path where git repository should be created/used
+            branch_name: Name of the branch to store history
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(repo_path, exist_ok=True)
+            
+            # Initialize git repo if not exists
+            git_dir = os.path.join(repo_path, '.git')
+            if not os.path.exists(git_dir):
+                print(f"Initializing git repository at: {repo_path}")
+                subprocess.run(['git', 'init'], cwd=repo_path, check=True, capture_output=True)
+                
+                # Create initial commit
+                readme_path = os.path.join(repo_path, 'README.md')
+                with open(readme_path, 'w', encoding='utf-8') as f:
+                    f.write(f"# Gerrit History Preservation\n\n")
+                    f.write(f"This repository preserves Gerrit review history.\n\n")
+                    f.write(f"- Branch `{branch_name}`: Contains patch files and HTML review data\n")
+                    f.write(f"- `patches/` directory: Patch files for each change\n")
+                    f.write(f"- `html/` directory: Browsable HTML review data\n")
+                
+                subprocess.run(['git', 'add', 'README.md'], cwd=repo_path, check=True, capture_output=True)
+                subprocess.run(['git', 'commit', '-m', 'Initial commit: Gerrit history preservation'], 
+                             cwd=repo_path, check=True, capture_output=True)
+                print(f"  Repository initialized successfully")
+            
+            # Create or checkout the history branch
+            result = subprocess.run(['git', 'rev-parse', '--verify', branch_name], 
+                                  cwd=repo_path, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                # Branch doesn't exist, create it
+                print(f"Creating branch: {branch_name}")
+                subprocess.run(['git', 'checkout', '-b', branch_name], 
+                             cwd=repo_path, check=True, capture_output=True)
+            else:
+                # Branch exists, checkout
+                print(f"Checking out existing branch: {branch_name}")
+                subprocess.run(['git', 'checkout', branch_name], 
+                             cwd=repo_path, check=True, capture_output=True)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error initializing git repository: {e}")
+            return False
+    
+    @staticmethod
+    def commit_files(repo_path: str, file_pattern: str, message: str) -> bool:
+        """
+        Add and commit files to the repository.
+        
+        Args:
+            repo_path: Path to git repository
+            file_pattern: File pattern to add (e.g., 'html/')
+            message: Commit message
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            subprocess.run(['git', 'add', file_pattern], cwd=repo_path, check=True, capture_output=True)
+            subprocess.run(['git', 'commit', '-m', message], cwd=repo_path, check=True, capture_output=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
