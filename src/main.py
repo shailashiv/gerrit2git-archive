@@ -12,7 +12,11 @@ import os
 import sys
 import traceback
 
-from .history_preserver import GerritHistoryPreserver
+# Handle both package and script execution
+try:
+    from .history_preserver import GerritHistoryPreserver
+except ImportError:
+    from history_preserver import GerritHistoryPreserver
 
 
 def main():
@@ -47,8 +51,8 @@ Examples:
     )
     parser.add_argument(
         '--query',
-        default='status:merged',
-        help='Gerrit query string (default: status:merged)'
+        default='status:merged OR status:open',
+        help='Gerrit query string (default: status:merged OR status:open)'
     )
     parser.add_argument(
         '--limit',
