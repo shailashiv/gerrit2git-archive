@@ -98,3 +98,45 @@ class GitManager:
             return True
         except subprocess.CalledProcessError:
             return False
+    
+    @staticmethod
+    def push_to_remote(repo_path: str, remote_url: str, branch_name: str = 'gerrit-history') -> bool:
+        """
+        Push the repository to a remote URL.
+        
+        Args:
+            repo_path: Path to git repository
+            remote_url: Remote repository URL (e.g., https://github.com/user/repo.git)
+            branch_name: Branch to push
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Check if remote 'origin' already exists
+            result = subprocess.run(['git', 'remote', 'get-url', 'origin'], 
+                                  cwd=repo_path, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                # Add remote origin
+                print(f"Adding remote origin: {remote_url}")
+                subprocess.run(['git', 'remote', 'add', 'origin', remote_url], 
+                             cwd=repo_path, check=True, capture_output=True)
+            else:
+                existing_url = result.stdout.strip()
+                if existing_url != remote_url:
+                    print(f"Updating remote origin from {existing_url} to {remote_url}")
+                    subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], 
+                                 cwd=repo_path, check=True, capture_output=True)
+            
+            # Push to remote
+            print(f"Pushing branch '{branch_name}' to remote...")
+            subprocess.run(['git', 'push', '-u', 'origin', branch_name], 
+                         cwd=repo_path, check=True, capture_output=True)
+            print(f"✓ Successfully pushed to {remote_url}")
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            print(f"Error pushing to remote: {e}")
+            print(f"  You may need to authenticate or check remote URL")
+            return False

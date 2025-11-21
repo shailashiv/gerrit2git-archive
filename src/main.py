@@ -69,12 +69,16 @@ Examples:
     parser.add_argument(
         '--repo-path',
         default='./gerrit-history-repo',
-        help='Path to git repository for storing patches as commits (default: ./gerrit-history-repo)'
+        help='Path to existing git repository or location to create new git repository for storing patches as commits (default: ./gerrit-history-repo)'
     )
     parser.add_argument(
         '--branch',
         default='gerrit-history',
         help='Git branch name for storing history (default: gerrit-history)'
+    )
+    parser.add_argument(
+        '--remote-url',
+        help='Remote git repository URL to push to (e.g., https://github.com/user/repo.git)'
     )
     parser.add_argument(
         '--export-only',
@@ -129,6 +133,11 @@ Examples:
                 limit=args.limit,
                 branch_name=args.branch
             )
+            
+            # Push to remote if specified
+            if args.remote_url:
+                from git_manager import GitManager
+                GitManager.push_to_remote(args.repo_path, args.remote_url, args.branch)
         
     except Exception as e:
         print(f"\nError: {e}", file=sys.stderr)
