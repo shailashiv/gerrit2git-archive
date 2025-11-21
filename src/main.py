@@ -8,6 +8,7 @@ This script preserves Gerrit review history by:
 """
 
 import argparse
+import getpass
 import os
 import sys
 import traceback
@@ -47,7 +48,7 @@ Examples:
     )
     parser.add_argument(
         '--password',
-        help='Gerrit HTTP password (for authenticated access)'
+        help='Gerrit HTTP password (for authenticated access). If username is provided but password is not, you will be prompted securely.'
     )
     parser.add_argument(
         '--query',
@@ -88,11 +89,16 @@ Examples:
     
     args = parser.parse_args()
     
+    # If username is provided but password is not, prompt for it securely
+    password = args.password
+    if args.username and not password:
+        password = getpass.getpass(f"Enter password for {args.username}: ")
+    
     # Create preserver instance
     preserver = GerritHistoryPreserver(
         gerrit_url=args.gerrit_url,
         username=args.username,
-        password=args.password,
+        password=password,
         verify_ssl=not args.no_verify_ssl
     )
     
