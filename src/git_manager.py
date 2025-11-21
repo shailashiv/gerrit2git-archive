@@ -25,28 +25,38 @@ class GitManager:
             True if successful, False otherwise
         """
         try:
+            # Check if repo_path is an existing git repository
+            git_dir = os.path.join(repo_path, '.git')
+            is_existing_repo = os.path.exists(git_dir)
+            
+            if is_existing_repo:
+                # Existing repo - create output folder inside it
+                output_path = os.path.join(repo_path, 'gerrit-archive')
+                os.makedirs(output_path, exist_ok=True)
+                print(f"Using existing git repository at: {repo_path}")
+                print(f"Creating output folder: gerrit-archive/")
+                return output_path
+            
             # Create directory if it doesn't exist
             os.makedirs(repo_path, exist_ok=True)
             
-            # Initialize git repo if not exists
-            git_dir = os.path.join(repo_path, '.git')
-            if not os.path.exists(git_dir):
-                print(f"Initializing git repository at: {repo_path}")
-                subprocess.run(['git', 'init'], cwd=repo_path, check=True, capture_output=True)
-                
-                # Create initial commit
-                readme_path = os.path.join(repo_path, 'README.md')
-                with open(readme_path, 'w', encoding='utf-8') as f:
-                    f.write(f"# Gerrit History Preservation\n\n")
-                    f.write(f"This repository preserves Gerrit review history.\n\n")
-                    f.write(f"- Branch `{branch_name}`: Contains patch files and HTML review data\n")
-                    f.write(f"- `patches/` directory: Patch files for each change\n")
-                    f.write(f"- `html/` directory: Browsable HTML review data\n")
-                
-                subprocess.run(['git', 'add', 'README.md'], cwd=repo_path, check=True, capture_output=True)
-                subprocess.run(['git', 'commit', '-m', 'Initial commit: Gerrit history preservation'], 
-                             cwd=repo_path, check=True, capture_output=True)
-                print(f"  Repository initialized successfully")
+            # Initialize new git repo
+            print(f"Initializing git repository at: {repo_path}")
+            subprocess.run(['git', 'init'], cwd=repo_path, check=True, capture_output=True)
+            
+            # Create initial commit
+            readme_path = os.path.join(repo_path, 'README.md')
+            with open(readme_path, 'w', encoding='utf-8') as f:
+                f.write(f"# Gerrit History Preservation\n\n")
+                f.write(f"This repository preserves Gerrit review history.\n\n")
+                f.write(f"- Branch `{branch_name}`: Contains patch files and HTML review data\n")
+                f.write(f"- `patches/` directory: Patch files for each change\n")
+                f.write(f"- `html/` directory: Browsable HTML review data\n")
+            
+            subprocess.run(['git', 'add', 'README.md'], cwd=repo_path, check=True, capture_output=True)
+            subprocess.run(['git', 'commit', '-m', 'Initial commit: Gerrit history preservation'], 
+                         cwd=repo_path, check=True, capture_output=True)
+            print(f"  Repository initialized successfully")
             
             # Create or checkout the history branch
             result = subprocess.run(['git', 'rev-parse', '--verify', branch_name], 

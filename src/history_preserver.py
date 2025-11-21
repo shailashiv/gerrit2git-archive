@@ -137,8 +137,21 @@ class GerritHistoryPreserver:
         print("=" * 70)
         
         # Initialize git repository
-        if not self.git_manager.init_repo(repo_path, branch_name):
+        # Initialize git repository and get the actual output path
+        result = self.git_manager.init_repo(repo_path, branch_name)
+        if not result:
             raise Exception("Failed to initialize git repository")
+        
+        # If result is a string (path), use it as the actual repo_path
+        if isinstance(result, str):
+            actual_repo_path = result
+            print(f"  Output will be stored in: {actual_repo_path}")
+        else:
+            actual_repo_path = repo_path
+        
+        # Update output_dir if it was set to repo_path
+        if output_dir == repo_path and actual_repo_path != repo_path:
+            output_dir = actual_repo_path
         
         # Create output directories
         patches_dir = os.path.join(output_dir, 'patches')
@@ -229,14 +242,14 @@ class GerritHistoryPreserver:
         print(f"\nAdding files to git repository...")
         
         # Copy patches
-        patches_repo_dir = os.path.join(repo_path, 'patches')
+        patches_repo_dir = os.path.join(actual_repo_path, 'patches')
         os.makedirs(patches_repo_dir, exist_ok=True)
         for patch_file in patch_files:
             dest = os.path.join(patches_repo_dir, os.path.basename(patch_file))
             shutil.copy2(patch_file, dest)
         
         # Copy HTML files
-        html_repo_dir = os.path.join(repo_path, 'html')
+        html_repo_dir = os.path.join(actual_repo_path, 'html')
         os.makedirs(html_repo_dir, exist_ok=True)
         for html_file in html_files:
             dest = os.path.join(html_repo_dir, os.path.basename(html_file))
@@ -249,7 +262,7 @@ class GerritHistoryPreserver:
         
         # Commit all files
         print(f"\nCommitting files to repository...")
-        if self.git_manager.commit_files(repo_path, '.', 
+        if self.git_manager.commit_files(actual_repo_path, '.', 
                                          f'Add {len(patch_files)} patches and {len(html_files)} HTML files'):
             print(f"  ✓ Patches and HTML files committed to repository")
         else:
@@ -262,10 +275,10 @@ class GerritHistoryPreserver:
         print(f"Total changes processed: {len(changes)}")
         print(f"Patches stored: {len(patch_files)}")
         print(f"HTML files generated: {len(html_files)}")
-        print(f"\nGit repository: {repo_path}")
+        print(f"\nGit repository: {actual_repo_path}")
         print(f"Git branch: {branch_name}")
-        print(f"Patches directory: {os.path.join(repo_path, 'patches')}")
-        print(f"HTML directory: {os.path.join(repo_path, 'html')}")
+        print(f"Patches directory: {os.path.join(actual_repo_path, 'patches')}")
+        print(f"HTML directory: {os.path.join(actual_repo_path, 'html')}")
         print(f"HTML index: {os.path.join(html_dir, 'index.html')}")
         print("=" * 70)
         
@@ -273,7 +286,7 @@ class GerritHistoryPreserver:
             'total_changes': len(changes),
             'patches_stored': len(patch_files),
             'html_files': len(html_files),
-            'repo_path': repo_path,
+            'repo_path': actual_repo_path,
             'branch_name': branch_name,
             'html_index': os.path.join(html_dir, 'index.html')
         }
