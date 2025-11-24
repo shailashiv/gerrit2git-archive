@@ -35,7 +35,7 @@ pip install -r requirements.txt
 Export merged changes from Gerrit:
 
 ```bash
-python run.py --gerrit-url https://gerrit.example.com --query "status:merged" --repo-path ./gerrit-history
+python run.py --gerrit-url https://gerrit.example.com --query "status:merged" --local-repo-path ./gerrit-history
 ```
 
 ### Command Line Options
@@ -49,12 +49,13 @@ python run.py --help
 
 **Optional:**
 - `--username`: Gerrit username (for authenticated access)
-- `--password`: Gerrit HTTP password (for authenticated access)
-- `--query`: Gerrit query string (default: `status:merged`)
+- `--password`: Gerrit HTTP password (prompted securely if username provided without password)
+- `--query`: Gerrit query string (default: `status:merged OR status:open`)
 - `--limit`: Maximum number of changes to fetch (default: 1000)
 - `--output-dir`: Directory for HTML and patch files (default: `./gerrit-export`)
-- `--repo-path`: Path to git repository (default: `./gerrit-history-repo`)
+- `--local-repo-path`: Path to existing or new git repository (default: `./gerrit-history-repo`)
 - `--branch`: Git branch name (default: `gerrit-history`)
+- `--git-url`: Remote git repository URL to push to (optional)
 - `--export-only`: Export patches and HTML only, skip git repository creation
 - `--no-verify-ssl`: Disable SSL certificate verification
 
@@ -64,22 +65,39 @@ python run.py --help
 ```bash
 python run.py --gerrit-url https://gerrit.example.com \
   --query "status:merged" \
-  --repo-path ./gerrit-history
+  --local-repo-path ./gerrit-history
 ```
 
 **Export specific project:**
 ```bash
 python run.py --gerrit-url https://gerrit.example.com \
   --query "project:my-project AND status:merged" \
-  --repo-path ./my-project-history
+  --local-repo-path ./my-project-history
 ```
 
-**Export with authentication:**
+**Export with authentication (secure password prompt):**
 ```bash
 python run.py --gerrit-url https://gerrit.example.com \
   --username john.doe \
-  --password your-http-password \
   --query "status:merged"
+# Password will be prompted securely (hidden input)
+```
+
+**Export and push to GitHub:**
+```bash
+python run.py --gerrit-url https://gerrit.example.com \
+  --username john.doe \
+  --query "status:merged" \
+  --local-repo-path ./gerrit-backup \
+  --git-url https://YOUR_TOKEN@github.com/username/gerrit-backup.git
+```
+
+**Use with existing git repository:**
+```bash
+python run.py --gerrit-url https://gerrit.example.com \
+  --query "status:merged" \
+  --local-repo-path /path/to/existing/repo
+# Creates 'gerrit-archive/' folder inside existing repo
 ```
 
 **Export without creating git repository:**

@@ -28,10 +28,10 @@ def main():
         epilog="""
 Examples:
   # Preserve all merged changes
-  python main.py --gerrit-url https://gerrit.example.com --query "status:merged" --repo-path ./gerrit-history
+  python main.py --gerrit-url https://gerrit.example.com --query "status:merged" --local-repo-path ./gerrit-history
   
   # Preserve specific project history
-  python main.py --gerrit-url https://gerrit.example.com --query "project:my-project" --repo-path ./my-project-history
+  python main.py --gerrit-url https://gerrit.example.com --query "project:my-project" --local-repo-path ./my-project-history
   
   # Export without git repository (HTML and patches only)
   python main.py --gerrit-url https://gerrit.example.com --export-only
@@ -67,7 +67,7 @@ Examples:
         help='Directory to save HTML and patch files (default: ./gerrit-export)'
     )
     parser.add_argument(
-        '--repo-path',
+        '--local-repo-path',
         default='./gerrit-history-repo',
         help='Path to existing git repository or location to create new git repository for storing patches as commits (default: ./gerrit-history-repo)'
     )
@@ -77,7 +77,7 @@ Examples:
         help='Git branch name for storing history (default: gerrit-history)'
     )
     parser.add_argument(
-        '--remote-url',
+        '--git-url',
         help='Remote git repository URL to push to (e.g., https://github.com/user/repo.git)'
     )
     parser.add_argument(
@@ -128,16 +128,16 @@ Examples:
             # Full history preservation workflow
             result = preserver.preserve_history(
                 output_dir=args.output_dir,
-                repo_path=args.repo_path,
+                repo_path=args.local_repo_path,
                 query=args.query,
                 limit=args.limit,
                 branch_name=args.branch
             )
             
             # Push to remote if specified
-            if args.remote_url:
+            if args.git_url:
                 from git_manager import GitManager
-                GitManager.push_to_remote(args.repo_path, args.remote_url, args.branch)
+                GitManager.push_to_remote(args.local_repo_path, args.git_url, args.branch)
         
     except Exception as e:
         print(f"\nError: {e}", file=sys.stderr)
