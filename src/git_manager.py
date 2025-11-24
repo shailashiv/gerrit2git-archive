@@ -129,14 +129,21 @@ class GitManager:
                     subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], 
                                  cwd=repo_path, check=True, capture_output=True)
             
-            # Push to remote
+            # Push to remote (allow interactive authentication)
             print(f"Pushing branch '{branch_name}' to remote...")
-            subprocess.run(['git', 'push', '-u', 'origin', branch_name], 
-                         cwd=repo_path, check=True, capture_output=True)
+            print(f"Note: You may be prompted for authentication...")
+            result = subprocess.run(['git', 'push', '-u', 'origin', branch_name], 
+                         cwd=repo_path, text=True)
+            
+            if result.returncode != 0:
+                print(f"Git push failed.")
+                print(f"  Please check your credentials or remote URL")
+                return False
+            
             print(f"✓ Successfully pushed to {remote_url}")
             return True
             
         except subprocess.CalledProcessError as e:
             print(f"Error pushing to remote: {e}")
-            print(f"  You may need to authenticate or check remote URL")
+            print(f"  Please check your credentials or remote URL")
             return False
