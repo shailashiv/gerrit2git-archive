@@ -482,9 +482,12 @@ class HTMLGenerator:
             owner_name = html.escape(owner.get('name', 'Unknown'))
             updated = change.get('updated', '')
             
+            # Generate filename with username to match actual file
+            owner_username = owner.get('username', owner.get('name', 'unknown'))
+            safe_owner = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in owner_username[:20])
             safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
                                   for c in change['subject'][:50])
-            html_filename = f"{change_number:04d}-{safe_subject}.html"
+            html_filename = f"{change_number:04d}-{safe_owner}-{safe_subject}.html"
             
             index_html += f'''<tr>
                     <td><a href="{html_filename}">{change_number}</a></td>
