@@ -270,6 +270,14 @@ class GerritHistoryPreserver:
         if os.path.exists(index_src):
             shutil.copy2(index_src, os.path.join(html_repo_dir, 'index.html'))
         
+        # Generate README.md at repository root
+        print(f"\nGenerating README.md...")
+        readme_path = os.path.join(actual_repo_path, 'README.md')
+        # Extract GitHub repo URL if available (will be empty if not pushing to remote)
+        github_repo = ''
+        self.html_generator.generate_readme_md(changes, readme_path, self.gerrit_url, 
+                                              github_repo, branch_name)
+        
         # Commit all files
         print(f"\nCommitting files to repository...")
         if self.git_manager.commit_files(actual_repo_path, '.', 

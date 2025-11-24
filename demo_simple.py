@@ -303,6 +303,16 @@ index def5678..ghi9012 100644
         shutil.copy2(index_path, os.path.join(repo_html_dir, 'index.html'))
         print(f"✓ Copied {len(html_files)} HTML files to repository")
         
+        # Generate README.md
+        readme_path = os.path.join(repo_path, 'README.md')
+        html_gen.generate_readme_md(
+            changes,
+            readme_path,
+            'https://gerrit.example.com',
+            'https://github.com/username/gerrit-backup',
+            'gerrit-history'
+        )
+        
         # Step 5: Commit to Git
         print("\n" + "-" * 70)
         print("STEP 5: Commit Files to Git")
