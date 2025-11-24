@@ -132,8 +132,13 @@ class GitManager:
             # Push to remote (allow interactive authentication)
             print(f"Pushing branch '{branch_name}' to remote...")
             print(f"Note: You may be prompted for authentication...")
+            
+            # Set GIT_TERMINAL_PROMPT to allow credential prompts
+            env = os.environ.copy()
+            env['GIT_TERMINAL_PROMPT'] = '1'
+            
             result = subprocess.run(['git', 'push', '-u', 'origin', branch_name], 
-                         cwd=repo_path, text=True)
+                         cwd=repo_path, text=True, env=env)
             
             if result.returncode != 0:
                 print(f"Git push failed.")
