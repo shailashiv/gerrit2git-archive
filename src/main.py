@@ -136,7 +136,10 @@ Examples:
             
             # Push to remote if specified
             if args.git_url:
-                from git_manager import GitManager
+                try:
+                    from .git_manager import GitManager
+                except ImportError:
+                    from git_manager import GitManager
                 GitManager.push_to_remote(args.local_repo_path, args.git_url, args.branch)
         
     except Exception as e:
