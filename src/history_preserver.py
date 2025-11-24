@@ -83,9 +83,13 @@ class GerritHistoryPreserver:
             patch_content = ''
             try:
                 patch_content = self.api_client.get_patch(change_number, current_revision)
+                # Get owner username
+                owner = change.get('owner', {})
+                owner_name = owner.get('username', owner.get('name', 'unknown'))
+                safe_owner = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in owner_name[:20])
                 safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
                                       for c in subject[:50])
-                patch_filename = f"{change_number:04d}-{safe_subject}.patch"
+                patch_filename = f"{change_number:04d}-{safe_owner}-{safe_subject}.patch"
                 patch_path = os.path.join(patches_dir, patch_filename)
                 
                 with open(patch_path, 'w', encoding='utf-8') as f:
@@ -99,7 +103,7 @@ class GerritHistoryPreserver:
             # Export HTML with diff
             try:
                 html_content = self.html_generator.generate_change_html(change_detail, comments, files, patch_content)
-                html_filename = f"{change_number:04d}-{safe_subject}.html"
+                html_filename = f"{change_number:04d}-{safe_owner}-{safe_subject}.html"
                 html_path = os.path.join(html_dir, html_filename)
                 
                 with open(html_path, 'w', encoding='utf-8') as f:
@@ -201,9 +205,13 @@ class GerritHistoryPreserver:
                 continue
             
             # Export patch
+            # Get owner username
+            owner = change.get('owner', {})
+            owner_name = owner.get('username', owner.get('name', 'unknown'))
+            safe_owner = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in owner_name[:20])
             safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
                                   for c in subject[:50])
-            patch_filename = f"{change_number:04d}-{safe_subject}.patch"
+            patch_filename = f"{change_number:04d}-{safe_owner}-{safe_subject}.patch"
             patch_path = os.path.join(patches_dir, patch_filename)
             
             patch_content = ''
@@ -220,7 +228,7 @@ class GerritHistoryPreserver:
             # Generate HTML with diff
             try:
                 html_content = self.html_generator.generate_change_html(change_detail, comments, files, patch_content)
-                html_filename = f"{change_number:04d}-{safe_subject}.html"
+                html_filename = f"{change_number:04d}-{safe_owner}-{safe_subject}.html"
                 html_path = os.path.join(html_dir, html_filename)
                 
                 with open(html_path, 'w', encoding='utf-8') as f:

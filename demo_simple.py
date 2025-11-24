@@ -187,9 +187,13 @@ def demo_workflow():
         
         for change in changes:
             change_num = change['_number']
+            # Get owner username
+            owner = change.get('owner', {})
+            owner_name = owner.get('username', owner.get('name', 'unknown'))
+            safe_owner = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in owner_name[:20])
             safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
                                   for c in change['subject'][:50])
-            patch_filename = f"{change_num:04d}-{safe_subject}.patch"
+            patch_filename = f"{change_num:04d}-{safe_owner}-{safe_subject}.patch"
             patch_path = os.path.join(patches_dir, patch_filename)
             
             # Create sample patch content with actual diff
@@ -261,9 +265,7 @@ index def5678..ghi9012 100644
             
             html_content = html_gen.generate_change_html(change, comments, files, patch_content)
             
-            safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
-                                  for c in change['subject'][:50])
-            html_filename = f"{change_num:04d}-{safe_subject}.html"
+            html_filename = f"{change_num:04d}-{safe_owner}-{safe_subject}.html"
             html_path = os.path.join(html_dir, html_filename)
             
             with open(html_path, 'w', encoding='utf-8') as f:
