@@ -13,7 +13,7 @@ class HTMLGenerator:
     """Generate HTML documentation for Gerrit changes."""
     
     @staticmethod
-    def generate_change_html(change: Dict, comments: Dict, files: Dict) -> str:
+    def generate_change_html(change: Dict, comments: Dict, files: Dict, patch_content: str = '') -> str:
         """
         Generate HTML representation of a Gerrit change.
         
@@ -21,6 +21,7 @@ class HTMLGenerator:
             change: Change object from Gerrit API
             comments: Comments dictionary
             files: Files dictionary
+            patch_content: Patch file content with diffs (optional)
             
         Returns:
             HTML string
@@ -62,6 +63,9 @@ class HTMLGenerator:
         # Get file list
         files_html = HTMLGenerator._generate_files_html(files)
         
+        # Get diff HTML from patch content
+        diff_html = HTMLGenerator._generate_diff_html(patch_content) if patch_content else ''
+        
         # Generate complete HTML
         html_content = f'''<!DOCTYPE html>
 <html lang="en">
@@ -94,6 +98,8 @@ class HTMLGenerator:
         {labels_html}
         
         {files_html}
+        
+        {diff_html}
         
         {messages_html}
         
@@ -181,6 +187,54 @@ class HTMLGenerator:
         return files_html
     
     @staticmethod
+    def _generate_diff_html(patch_content: str) -> str:
+        """Generate HTML for diff/patch content."""
+        if not patch_content:
+            return ''
+        
+        diff_html = '<div class="diff-section"><h3>Code Changes (Diff)</h3>'
+        
+        # Split patch into lines
+        lines = patch_content.split('\n')
+        current_file = None
+        in_diff = False
+        
+        for line in lines:
+            # File header
+            if line.startswith('diff --git'):
+                if current_file:
+                    diff_html += '</pre></div>'  # Close previous file
+                in_diff = True
+                diff_html += '<div class="diff-file">'
+            elif line.startswith('---') or line.startswith('+++'):
+                if line.startswith('+++'):
+                    # Extract filename
+                    filename = line[4:].split('\t')[0].strip()
+                    if filename != '/dev/null':
+                        current_file = filename
+                        diff_html += f'<h4 class="diff-filename">{html.escape(filename)}</h4>'
+                        diff_html += '<pre class="diff-content">'
+            elif line.startswith('@@'):
+                # Hunk header
+                diff_html += f'<span class="diff-hunk">{html.escape(line)}</span>\n'
+            elif line.startswith('+') and not line.startswith('+++'):
+                # Added line
+                diff_html += f'<span class="diff-add">{html.escape(line)}</span>\n'
+            elif line.startswith('-') and not line.startswith('---'):
+                # Deleted line
+                diff_html += f'<span class="diff-del">{html.escape(line)}</span>\n'
+            elif in_diff and current_file and not line.startswith('diff'):
+                # Context line
+                diff_html += f'<span class="diff-ctx">{html.escape(line)}</span>\n'
+        
+        # Close last file
+        if current_file:
+            diff_html += '</pre></div>'
+        
+        diff_html += '</div>'
+        return diff_html
+    
+    @staticmethod
     def _get_css() -> str:
         """Return CSS styles for HTML pages."""
         return '''body {
@@ -249,6 +303,53 @@ class HTMLGenerator:
         }
         .labels, .messages, .inline-comments, .files {
             margin: 30px 0;
+        }
+        .diff-section {
+            margin: 30px 0;
+        }
+        .diff-file {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .diff-filename {
+            background-color: #f6f8fa;
+            padding: 10px 15px;
+            margin: 0;
+            border-bottom: 1px solid #ddd;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #24292e;
+        }
+        .diff-content {
+            background-color: #fff;
+            padding: 0;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .diff-content span {
+            display: block;
+            padding: 0 10px;
+            white-space: pre;
+        }
+        .diff-hunk {
+            background-color: #f1f8ff;
+            color: #0366d6;
+            font-weight: bold;
+        }
+        .diff-add {
+            background-color: #e6ffed;
+            color: #22863a;
+        }
+        .diff-del {
+            background-color: #ffeef0;
+            color: #cb2431;
+        }
+        .diff-ctx {
+            color: #24292e;
         }
         .message {
             background-color: #f9f9f9;

@@ -176,8 +176,78 @@ def demo_workflow():
             return
         
         # Step 2: Generate HTML Files
+        print("-" * 70)
+        
+        # First create patch files to get content for HTML
+        print("STEP 2: Create Patch Files")
+        print("-" * 70)
+        
+        patch_files = []
+        patch_contents = {}  # Store patch content for HTML generation
+        
+        for change in changes:
+            change_num = change['_number']
+            safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
+                                  for c in change['subject'][:50])
+            patch_filename = f"{change_num:04d}-{safe_subject}.patch"
+            patch_path = os.path.join(patches_dir, patch_filename)
+            
+            # Create sample patch content with actual diff
+            patch_content = f"""From {change['current_revision']} Mon Sep 17 00:00:00 2001
+From: {change['owner']['name']} <{change['owner']['email']}>
+Date: {change['created']}
+Subject: [PATCH] {change['subject']}
+
+{change['revisions'][change['current_revision']]['commit']['message']}
+---
+"""
+            # Add sample diff for each file
+            for file_path, file_info in files_map.get(change_num, {}).items():
+                if file_path == '/COMMIT_MSG':
+                    continue
+                status = file_info.get('status', 'M')
+                lines_inserted = file_info.get('lines_inserted', 0)
+                lines_deleted = file_info.get('lines_deleted', 0)
+                
+                patch_content += f""" {file_path} | {lines_inserted + lines_deleted} {'+'*min(lines_inserted, 20)}{'-'*min(lines_deleted, 20)}
+"""
+                
+                if status == 'A':
+                    # New file
+                    patch_content += f"""
+diff --git a/{file_path} b/{file_path}
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/{file_path}
+@@ -0,0 +1,{lines_inserted} @@
+"""
+                    for i in range(min(5, lines_inserted)):
+                        patch_content += f"+    # New code line {i+1}\n"
+                else:
+                    # Modified file
+                    patch_content += f"""
+diff --git a/{file_path} b/{file_path}
+index def5678..ghi9012 100644
+--- a/{file_path}
++++ b/{file_path}
+@@ -10,{lines_deleted} +10,{lines_inserted} @@
+"""
+                    for i in range(min(3, lines_deleted)):
+                        patch_content += f"-    # Old code line {i+1}\n"
+                    for i in range(min(3, lines_inserted)):
+                        patch_content += f"+    # New code line {i+1}\n"
+            
+            with open(patch_path, 'w', encoding='utf-8') as f:
+                f.write(patch_content)
+            
+            patch_files.append(patch_path)
+            patch_contents[change_num] = patch_content
+            print(f"✓ Created: {patch_filename}")
+        
+        # Step 3: Generate HTML Files with Diffs
         print("\n" + "-" * 70)
-        print("STEP 2: Generate HTML Files")
+        print("STEP 3: Generate HTML Files with Diffs")
         print("-" * 70)
         
         html_gen = HTMLGenerator()
@@ -187,8 +257,9 @@ def demo_workflow():
             change_num = change['_number']
             comments = comments_map.get(change_num, {})
             files = files_map.get(change_num, {})
+            patch_content = patch_contents.get(change_num, '')
             
-            html_content = html_gen.generate_change_html(change, comments, files)
+            html_content = html_gen.generate_change_html(change, comments, files, patch_content)
             
             safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
                                   for c in change['subject'][:50])
@@ -206,39 +277,7 @@ def demo_workflow():
         html_gen.generate_index_html(changes, index_path)
         print(f"✓ Generated: index.html")
         
-        # Step 3: Create Patch Files
-        print("\n" + "-" * 70)
-        print("STEP 3: Create Patch Files")
-        print("-" * 70)
-        
-        patch_files = []
-        for change in changes:
-            change_num = change['_number']
-            safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
-                                  for c in change['subject'][:50])
-            patch_filename = f"{change_num:04d}-{safe_subject}.patch"
-            patch_path = os.path.join(patches_dir, patch_filename)
-            
-            # Create sample patch content
-            patch_content = f"""From {change['current_revision']} Mon Sep 17 00:00:00 2001
-From: {change['owner']['name']} <{change['owner']['email']}>
-Date: {change['created']}
-Subject: [PATCH] {change['subject']}
-
-{change['revisions'][change['current_revision']]['commit']['message']}
----
-"""
-            for file_path in files_map[change_num].keys():
-                file_info = files_map[change_num][file_path]
-                patch_content += f" {file_path} | {file_info['lines_inserted']} ++, {file_info['lines_deleted']} --\n"
-            
-            with open(patch_path, 'w', encoding='utf-8') as f:
-                f.write(patch_content)
-            
-            patch_files.append(patch_path)
-            print(f"✓ Created: {patch_filename}")
-        
-        # Step 4: Copy to Git Repository
+        # Step 4: Copy Files to Git Repository
         print("\n" + "-" * 70)
         print("STEP 4: Copy Files to Git Repository")
         print("-" * 70)

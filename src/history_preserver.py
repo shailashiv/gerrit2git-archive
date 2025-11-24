@@ -80,6 +80,7 @@ class GerritHistoryPreserver:
                 continue
             
             # Export patch
+            patch_content = ''
             try:
                 patch_content = self.api_client.get_patch(change_number, current_revision)
                 safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
@@ -95,9 +96,9 @@ class GerritHistoryPreserver:
             except Exception as e:
                 print(f"  Error exporting patch: {e}")
             
-            # Export HTML
+            # Export HTML with diff
             try:
-                html_content = self.html_generator.generate_change_html(change_detail, comments, files)
+                html_content = self.html_generator.generate_change_html(change_detail, comments, files, patch_content)
                 html_filename = f"{change_number:04d}-{safe_subject}.html"
                 html_path = os.path.join(html_dir, html_filename)
                 
@@ -205,6 +206,7 @@ class GerritHistoryPreserver:
             patch_filename = f"{change_number:04d}-{safe_subject}.patch"
             patch_path = os.path.join(patches_dir, patch_filename)
             
+            patch_content = ''
             try:
                 patch_content = self.api_client.get_patch(change_number, current_revision)
                 with open(patch_path, 'w', encoding='utf-8') as f:
@@ -215,9 +217,9 @@ class GerritHistoryPreserver:
                 print(f"  ⚠ Error exporting patch: {e}")
                 continue
             
-            # Generate HTML
+            # Generate HTML with diff
             try:
-                html_content = self.html_generator.generate_change_html(change_detail, comments, files)
+                html_content = self.html_generator.generate_change_html(change_detail, comments, files, patch_content)
                 html_filename = f"{change_number:04d}-{safe_subject}.html"
                 html_path = os.path.join(html_dir, html_filename)
                 
