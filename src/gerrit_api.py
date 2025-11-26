@@ -54,17 +54,56 @@ class GerritAPIClient:
     
     def get_changes(self, query: str = "status:open", limit: int = 100) -> List[Dict]:
         """
-        Query Gerrit changes.
+        Query Gerrit changes with automatic pagination support.
         
         Args:
             query: Gerrit query string (e.g., "status:open", "project:my-project")
-            limit: Maximum number of changes to fetch
+            limit: Maximum number of changes to fetch (will paginate if > 500)
             
         Returns:
             List of change objects
         """
-        endpoint = f'/a/changes/?q={query}&n={limit}&o=CURRENT_REVISION&o=CURRENT_COMMIT&o=DETAILED_ACCOUNTS&o=MESSAGES&o=DETAILED_LABELS'
-        return self._make_request(endpoint)
+        all_changes = []
+        start = 0
+        batch_size = 500  # Gerrit's maximum per request
+        
+        while len(all_changes) < limit:
+            # Calculate how many to fetch in this batch
+            remaining = limit - len(all_changes)
+            current_batch_size = min(batch_size, remaining)
+            
+            endpoint = f'/a/changes/?q={query}&n={current_batch_size}&S={start}&o=CURRENT_REVISION&o=CURRENT_COMMIT&o=DETAILED_ACCOUNTS&o=MESSAGES&o=DETAILED_LABELS'
+            
+            try:
+                batch = self._make_request(endpoint)
+                
+                if not batch:
+                    # No more results
+                    break
+                
+                all_changes.extend(batch)
+                
+                # Check if there are more changes
+                # Gerrit includes _more_changes: true in the last item if there are more results
+                if len(batch) < current_batch_size:
+                    # Got fewer results than requested, no more changes available
+                    break
+                
+                # Check the _more_changes flag (it's on the last change object)
+                if batch and isinstance(batch[-1], dict) and not batch[-1].get('_more_changes', False):
+                    # No more changes available
+                    break
+                
+                # Move to next batch
+                start += len(batch)
+                
+                print(f"  Fetched {len(all_changes)} changes so far...")
+                
+            except Exception as e:
+                print(f"  Warning: Error fetching batch at offset {start}: {e}")
+                break
+        
+        return all_changes[:limit]  # Ensure we don't exceed the requested limit
     
     def get_change_detail(self, change_id: str) -> Dict:
         """

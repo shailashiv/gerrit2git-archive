@@ -35,6 +35,22 @@ class GitManager:
                 os.makedirs(output_path, exist_ok=True)
                 print(f"Using existing git repository at: {repo_path}")
                 print(f"Creating output folder: gerrit-archive/")
+                
+                # Create or checkout the history branch
+                result = subprocess.run(['git', 'rev-parse', '--verify', branch_name], 
+                                      cwd=repo_path, capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    # Branch doesn't exist, create it
+                    print(f"Creating branch: {branch_name}")
+                    subprocess.run(['git', 'checkout', '-b', branch_name], 
+                                 cwd=repo_path, check=True, capture_output=True)
+                else:
+                    # Branch exists, checkout
+                    print(f"Checking out existing branch: {branch_name}")
+                    subprocess.run(['git', 'checkout', branch_name], 
+                                 cwd=repo_path, check=True, capture_output=True)
+                
                 return output_path
             
             # Create directory if it doesn't exist

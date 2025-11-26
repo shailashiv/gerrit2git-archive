@@ -469,6 +469,7 @@ class HTMLGenerator:
                     <th>Status</th>
                     <th>Owner</th>
                     <th>Updated</th>
+                    <th>Patch</th>
                 </tr>
             </thead>
             <tbody>'''
@@ -488,6 +489,7 @@ class HTMLGenerator:
             safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' 
                                   for c in change['subject'][:50])
             html_filename = f"{change_number:04d}-{safe_owner}-{safe_subject}.html"
+            patch_filename = f"{change_number:04d}-{safe_owner}.patch"
             
             index_html += f'''<tr>
                     <td><a href="{html_filename}">{change_number}</a></td>
@@ -496,6 +498,7 @@ class HTMLGenerator:
                     <td><span class="status {status.lower()}">{status}</span></td>
                     <td>{owner_name}</td>
                     <td>{updated}</td>
+                    <td><a href="../patches/{patch_filename}" download>{change_number}-{safe_owner}.patch</a></td>
                 </tr>'''
         
         index_html += '''</tbody>
