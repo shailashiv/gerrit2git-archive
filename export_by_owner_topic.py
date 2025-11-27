@@ -30,7 +30,8 @@ def sanitize_name(name):
 
 
 def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topics_list, output_dir, 
-                              verify_ssl=True, limit=5000, git_repo_path=None, git_branch='main', git_url=None):
+                              verify_ssl=True, limit=5000, git_repo_path=None, git_branch='main', git_url=None,
+                              clone_if_needed=True):
     """
     Export patches organized by owner and topic.
     
@@ -46,6 +47,7 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
         git_repo_path: Path to git repository (None = no git operations)
         git_branch: Git branch name
         git_url: Remote git URL for push
+        clone_if_needed: Clone repository from git_url if it doesn't exist locally
     """
     # Create API client
     api_client = GerritAPIClient(gerrit_url, username, password, verify_ssl)
@@ -189,8 +191,59 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
         print("GIT OPERATIONS")
         print(f"{'='*70}")
         
+        # Check if git repo exists
+        git_dir = os.path.join(git_repo_path, '.git')
+        repo_exists = os.path.exists(git_dir)
+        
+        if not repo_exists and git_url and clone_if_needed:
+            print(f"\nCloning existing repository from: {git_url}")
+            import subprocess
+            try:
+                subprocess.run(
+                    ['git', 'clone', '-b', git_branch, git_url, git_repo_path],
+                    check=True,
+                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '1'}
+                )
+                print("✓ Repository cloned successfully")
+            except subprocess.CalledProcessError as e:
+                print(f"✗ Failed to clone repository: {e}")
+                print("\nTrying to clone without branch specification...")
+                try:
+                    subprocess.run(
+                        ['git', 'clone', git_url, git_repo_path],
+                        check=True,
+                        env={**os.environ, 'GIT_TERMINAL_PROMPT': '1'}
+                    )
+                    print("✓ Repository cloned successfully")
+                    # Try to checkout the branch
+                    subprocess.run(
+                        ['git', 'checkout', git_branch],
+                        cwd=git_repo_path,
+                        check=False
+                    )
+                except subprocess.CalledProcessError as e2:
+                    print(f"✗ Failed to clone repository: {e2}")
+                    sys.exit(1)
+        
         git_manager = GitManager(git_repo_path)
-        git_manager.init_repo()
+        
+        if not repo_exists and not git_url:
+            # New repo without remote
+            git_manager.init_repo()
+        elif repo_exists:
+            print(f"\nUsing existing repository at: {git_repo_path}")
+            # Pull latest changes
+            print("Pulling latest changes...")
+            import subprocess
+            try:
+                subprocess.run(
+                    ['git', 'pull', 'origin', git_branch],
+                    cwd=git_repo_path,
+                    check=False,
+                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '1'}
+                )
+            except Exception as e:
+                print(f"Warning: Could not pull latest changes: {e}")
         
         print("\nCommitting patches...")
         commit_message = f"Export {total_exported} patches by {owner_name}"
@@ -245,6 +298,13 @@ Examples:
       --topics gt_infra eq_event_optz \\
       --local-repo-path ./organized-patches \\
       --git-url https://github.com/user/repo.git
+  
+  # Add to existing repo as subfolder (clones if needed)
+  python export_by_owner_topic.py --gerrit-url https://gerrit.habana-labs.com \\
+      --owner "Sanyog Kale <skale@habana.ai>" \\
+      --local-repo-path ./my-repo \\
+      --git-url https://github.com/user/existing-repo.git \\
+      --branch main
         """
     )
     
@@ -336,7 +396,8 @@ Examples:
             limit=args.limit,
             git_repo_path=args.local_repo_path,
             git_branch=args.branch,
-            git_url=args.git_url
+            git_url=args.git_url,
+            clone_if_needed=True
         )
     except Exception as e:
         print(f"\nError: {e}", file=sys.stderr)
