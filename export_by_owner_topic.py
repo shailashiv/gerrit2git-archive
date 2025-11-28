@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.gerrit_api import GerritAPIClient
-from src.git_manager import GitManager
+from src.html_generator import HTMLGenerator
 
 
 def sanitize_name(name):
@@ -25,13 +25,12 @@ def sanitize_name(name):
     # Extract name from "Name <email>" format
     if '<' in name and '>' in name:
         name = name.split('<')[0].strip()
-    # Replace special characters
+    # Replace special characters (including forward slashes)
     return "".join(c if c.isalnum() or c in ('-', '_', ' ') else '_' for c in name).strip().replace(' ', '_')
 
 
 def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topics_list, output_dir, 
-                              verify_ssl=True, limit=5000, git_repo_path=None, git_branch='main', git_url=None,
-                              clone_if_needed=True):
+                              verify_ssl=True, limit=5000):
     """
     Export patches organized by owner and topic.
     
@@ -44,10 +43,6 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
         output_dir: Base output directory
         verify_ssl: Whether to verify SSL certificates
         limit: Maximum number of changes to fetch
-        git_repo_path: Path to git repository (None = no git operations)
-        git_branch: Git branch name
-        git_url: Remote git URL for push
-        clone_if_needed: Clone repository from git_url if it doesn't exist locally
     """
     # Create API client
     api_client = GerritAPIClient(gerrit_url, username, password, verify_ssl)
@@ -57,7 +52,8 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
     
     # Add topic filter if topics list provided
     if topics_list:
-        topic_query = " OR ".join([f'topic:{topic}' for topic in topics_list])
+        # Quote topics with special characters to avoid query parsing issues
+        topic_query = " OR ".join([f'topic:"{topic}"' for topic in topics_list])
         query += f' AND ({topic_query})'
     
     print(f"Fetching changes from: {gerrit_url}")
@@ -115,6 +111,13 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
                 continue
             
             try:
+                # Get detailed change info
+                change_detail = api_client.get_change_detail(change_number)
+                
+                # Get comments and files
+                comments = api_client.get_change_comments(change_number)
+                files = api_client.get_change_files(change_number, current_revision)
+                
                 # Get patch content
                 patch_content = api_client.get_patch(change_number, current_revision)
                 
@@ -123,12 +126,25 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
                 owner_username = owner.get('username', owner.get('name', 'unknown'))
                 safe_owner = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in owner_username[:20])
                 safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in subject[:50])
-                patch_filename = f"{change_number:06d}-{safe_owner}-{safe_subject}.patch"
-                patch_path = os.path.join(topic_dir, patch_filename)
+                base_filename = f"{change_number:06d}-{safe_owner}-{safe_subject}"
                 
                 # Save patch
+                patch_filename = f"{base_filename}.patch"
+                patch_path = os.path.join(topic_dir, patch_filename)
                 with open(patch_path, 'w', encoding='utf-8') as f:
                     f.write(patch_content)
+                
+                # Generate HTML
+                html_content = HTMLGenerator.generate_change_html(
+                    change_detail,
+                    comments,
+                    files,
+                    patch_content
+                )
+                html_filename = f"{base_filename}.html"
+                html_path = os.path.join(topic_dir, html_filename)
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
                 
                 print(f"  ✓ #{change_number}: {subject[:60]}")
                 total_exported += 1
@@ -155,6 +171,13 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
                 continue
             
             try:
+                # Get detailed change info
+                change_detail = api_client.get_change_detail(change_number)
+                
+                # Get comments and files
+                comments = api_client.get_change_comments(change_number)
+                files = api_client.get_change_files(change_number, current_revision)
+                
                 # Get patch content
                 patch_content = api_client.get_patch(change_number, current_revision)
                 
@@ -163,18 +186,45 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
                 owner_username = owner.get('username', owner.get('name', 'unknown'))
                 safe_owner = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in owner_username[:20])
                 safe_subject = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in subject[:50])
-                patch_filename = f"{change_number:06d}-{safe_owner}-{safe_subject}.patch"
-                patch_path = os.path.join(no_topic_dir, patch_filename)
+                base_filename = f"{change_number:06d}-{safe_owner}-{safe_subject}"
                 
                 # Save patch
+                patch_filename = f"{base_filename}.patch"
+                patch_path = os.path.join(no_topic_dir, patch_filename)
                 with open(patch_path, 'w', encoding='utf-8') as f:
                     f.write(patch_content)
+                
+                # Generate HTML
+                html_content = HTMLGenerator.generate_change_html(
+                    change_detail,
+                    comments,
+                    files,
+                    patch_content
+                )
+                html_filename = f"{base_filename}.html"
+                html_path = os.path.join(no_topic_dir, html_filename)
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
                 
                 print(f"  ✓ #{change_number}: {subject[:60]}")
                 total_exported += 1
                 
             except Exception as e:
                 print(f"  ✗ #{change_number}: Error - {e}")
+    
+    # Generate index.html in owner folder
+    print("\nGenerating index.html...")
+    index_content = HTMLGenerator.generate_owner_index_html(
+        owner_query,
+        owner_name,
+        changes,
+        topics,
+        no_topic
+    )
+    index_path = os.path.join(owner_dir, 'index.html')
+    with open(index_path, 'w', encoding='utf-8') as f:
+        f.write(index_content)
+    print(f"✓ Index page created: {index_path}")
     
     print("\n" + "=" * 70)
     print("EXPORT COMPLETE")
@@ -183,82 +233,8 @@ def export_by_owner_and_topic(gerrit_url, username, password, owner_query, topic
     print(f"Output directory: {os.path.abspath(output_dir)}")
     print(f"Owner folder: {owner_name}")
     print(f"Topics: {len(topics)}")
+    print(f"Index page: {index_path}")
     print("=" * 70)
-    
-    # Git operations if requested
-    if git_repo_path:
-        print(f"\n{'='*70}")
-        print("GIT OPERATIONS")
-        print(f"{'='*70}")
-        
-        # Check if git repo exists
-        git_dir = os.path.join(git_repo_path, '.git')
-        repo_exists = os.path.exists(git_dir)
-        
-        if not repo_exists and git_url and clone_if_needed:
-            print(f"\nCloning existing repository from: {git_url}")
-            import subprocess
-            try:
-                subprocess.run(
-                    ['git', 'clone', '-b', git_branch, git_url, git_repo_path],
-                    check=True,
-                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '1'}
-                )
-                print("✓ Repository cloned successfully")
-            except subprocess.CalledProcessError as e:
-                print(f"✗ Failed to clone repository: {e}")
-                print("\nTrying to clone without branch specification...")
-                try:
-                    subprocess.run(
-                        ['git', 'clone', git_url, git_repo_path],
-                        check=True,
-                        env={**os.environ, 'GIT_TERMINAL_PROMPT': '1'}
-                    )
-                    print("✓ Repository cloned successfully")
-                    # Try to checkout the branch
-                    subprocess.run(
-                        ['git', 'checkout', git_branch],
-                        cwd=git_repo_path,
-                        check=False
-                    )
-                except subprocess.CalledProcessError as e2:
-                    print(f"✗ Failed to clone repository: {e2}")
-                    sys.exit(1)
-        
-        git_manager = GitManager(git_repo_path)
-        
-        if not repo_exists and not git_url:
-            # New repo without remote
-            git_manager.init_repo()
-        elif repo_exists:
-            print(f"\nUsing existing repository at: {git_repo_path}")
-            # Pull latest changes
-            print("Pulling latest changes...")
-            import subprocess
-            try:
-                subprocess.run(
-                    ['git', 'pull', 'origin', git_branch],
-                    cwd=git_repo_path,
-                    check=False,
-                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '1'}
-                )
-            except Exception as e:
-                print(f"Warning: Could not pull latest changes: {e}")
-        
-        print("\nCommitting patches...")
-        commit_message = f"Export {total_exported} patches by {owner_name}"
-        if topics_list:
-            commit_message += f" for {len(topics_list)} topics"
-        git_manager.commit_files(commit_message)
-        
-        if git_url:
-            print(f"\nPushing to remote: {git_url}")
-            success = git_manager.push_to_remote(git_url, git_branch)
-            if success:
-                print("✓ Successfully pushed to remote repository")
-            else:
-                print("✗ Failed to push to remote repository")
-                sys.exit(1)
 
 
 def main():
@@ -284,27 +260,6 @@ Examples:
       --owner "Sanyog Kale <skale@habana.ai>" \\
       --topics-file topics.txt \\
       --output-dir ./organized-patches
-  
-  # Export and push to GitHub
-  python export_by_owner_topic.py --gerrit-url https://gerrit.habana-labs.com \\
-      --owner "Sanyog Kale <skale@habana.ai>" \\
-      --topics gt_infra eq_event_optz \\
-      --local-repo-path ./organized-patches \\
-      --git-url https://github.com/user/repo.git
-  
-  # Export and push to GitHub
-  python export_by_owner_topic.py --gerrit-url https://gerrit.habana-labs.com \\
-      --owner "Sanyog Kale <skale@habana.ai>" \\
-      --topics gt_infra eq_event_optz \\
-      --local-repo-path ./organized-patches \\
-      --git-url https://github.com/user/repo.git
-  
-  # Add to existing repo as subfolder (clones if needed)
-  python export_by_owner_topic.py --gerrit-url https://gerrit.habana-labs.com \\
-      --owner "Sanyog Kale <skale@habana.ai>" \\
-      --local-repo-path ./my-repo \\
-      --git-url https://github.com/user/existing-repo.git \\
-      --branch main
         """
     )
     
@@ -351,19 +306,6 @@ Examples:
         action='store_true',
         help='Disable SSL certificate verification'
     )
-    parser.add_argument(
-        '--local-repo-path',
-        help='Local git repository path (creates git repo if provided)'
-    )
-    parser.add_argument(
-        '--branch',
-        default='main',
-        help='Git branch name (default: main)'
-    )
-    parser.add_argument(
-        '--git-url',
-        help='Remote git URL for push (e.g., https://github.com/user/repo.git)'
-    )
     
     args = parser.parse_args()
     
@@ -393,11 +335,7 @@ Examples:
             topics_list=topics_list,
             output_dir=args.output_dir,
             verify_ssl=not args.no_verify_ssl,
-            limit=args.limit,
-            git_repo_path=args.local_repo_path,
-            git_branch=args.branch,
-            git_url=args.git_url,
-            clone_if_needed=True
+            limit=args.limit
         )
     except Exception as e:
         print(f"\nError: {e}", file=sys.stderr)
